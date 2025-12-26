@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../screens/home_screen.dart';
-import '../screens/difficulty_selector_screen.dart';
 import '../screens/practice_session_screen.dart';
 import '../screens/session_results_screen.dart';
 import '../screens/progress_dashboard_screen.dart';
@@ -14,7 +13,6 @@ class AppRoutes {
   // Route names
   static const String splash = '/';
   static const String home = '/home';
-  static const String difficultySelector = '/difficulty-selector';
   static const String practiceSession = '/practice-session';
   static const String sessionResults = '/session-results';
   static const String progressDashboard = '/progress-dashboard';
@@ -37,12 +35,6 @@ class AppRoutes {
           settings: settings,
         );
 
-      case difficultySelector:
-        return MaterialPageRoute(
-          builder: (context) => const DifficultySelectorScreen(),
-          settings: settings,
-        );
-
       case practiceSession:
         // Arguments: {difficultyLevel: int, operations: List<Operation>, timeLimitSeconds: int?}
         final args = settings.arguments as Map<String, dynamic>?;
@@ -59,9 +51,9 @@ class AppRoutes {
             settings: settings,
           );
         }
-        // Fallback to difficulty selector if no arguments
+        // Fallback to home if no arguments
         return MaterialPageRoute(
-          builder: (context) => const DifficultySelectorScreen(),
+          builder: (context) => const HomeScreen(),
           settings: settings,
         );
 
@@ -108,11 +100,6 @@ class AppRoutes {
   /// Navigation helper - go to home (replacing current route)
   static void goToHome(BuildContext context) {
     Navigator.of(context).pushReplacementNamed(home);
-  }
-
-  /// Navigation helper - go to difficulty selector
-  static void goToDifficultySelector(BuildContext context) {
-    Navigator.of(context).pushNamed(difficultySelector);
   }
 
   /// Navigation helper - go to practice session

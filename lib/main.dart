@@ -3,22 +3,40 @@ import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'utils/theme.dart';
-import 'config/routes.dart';
 import 'providers/student_provider.dart';
 import 'providers/game_provider.dart';
 import 'providers/statistics_provider.dart';
+import 'services/storage_service.dart';
+import 'services/audio_service.dart';
+import 'screens/main_shell.dart';
 import 'screens/splash_screen.dart';
+import 'screens/progress_dashboard_screen.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
   // Initialize Hive for local storage
   await Hive.initFlutter();
+
+  // Initialize services (using factory constructors)
+  final storageService = StorageService();
+  await storageService.initialize();
+  
+  final audioService = AudioService();
+  await audioService.initialize();
 
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => StudentProvider()),
-        ChangeNotifierProvider(create: (_) => GameProvider()),
-        ChangeNotifierProvider(create: (_) => StatisticsProvider()),
+        ChangeNotifierProvider(
+          create: (_) => StudentProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => GameProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => StatisticsProvider(),
+        ),
       ],
       child: const MathPracticeApp(),
     ),
@@ -34,10 +52,13 @@ class MathPracticeApp extends StatelessWidget {
       title: 'Math Practice App',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.light,
+      themeMode: ThemeMode.system,
+      debugShowCheckedModeBanner: false,
       home: const SplashScreen(),
-      routes: AppRoutes.routes,
-      onGenerateRoute: AppRoutes.onGenerateRoute,
+      routes: {
+        '/main': (context) => const MainShell(),
+        '/progress': (context) => const ProgressDashboardScreen(),
+      },
     );
   }
 }

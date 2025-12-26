@@ -84,6 +84,73 @@ class ProblemGenerator {
 
     return problems;
   }
+  
+  /// Generate problems with custom number range (used by settings)
+  static List<MathProblem> generateSessionProblemsWithRange({
+    required int minNumber,
+    required int maxNumber,
+    required List<Operation> operations,
+    required int problemCount,
+  }) {
+    _generatedProblems.clear();
+    final problems = <MathProblem>[];
+    
+    for (int i = 0; i < problemCount; i++) {
+      final operation = operations[i % operations.length];
+      final problem = generateProblemWithRange(
+        minNumber: minNumber,
+        maxNumber: maxNumber,
+        operation: operation,
+      );
+      problems.add(problem);
+    }
+    
+    return problems;
+  }
+  
+  /// Generate a single problem with custom number range
+  static MathProblem generateProblemWithRange({
+    required int minNumber,
+    required int maxNumber,
+    required Operation operation,
+  }) {
+    String problemKey;
+    int firstNumber, secondNumber;
+    
+    // Generate unique problem
+    do {
+      firstNumber = _generateNumber(minNumber, maxNumber);
+      secondNumber = _generateNumber(minNumber, maxNumber);
+      
+      // For subtraction, ensure result is not negative (swap if needed)
+      if (operation == Operation.subtract && firstNumber < secondNumber) {
+        final temp = firstNumber;
+        firstNumber = secondNumber;
+        secondNumber = temp;
+      }
+      
+      // For division, ensure clean integer result
+      if (operation == Operation.divide) {
+        // Pick a divisor that gives clean result within range
+        if (firstNumber == 0) firstNumber = maxNumber > 0 ? maxNumber : 1;
+        secondNumber = _generateDivisor(firstNumber.abs());
+        if (secondNumber == 0) secondNumber = 1;
+      }
+      
+      problemKey = '${operation.symbol}_${firstNumber}_${secondNumber}';
+    } while (_generatedProblems.contains(problemKey) && _generatedProblems.length < 100);
+    
+    _generatedProblems.add(problemKey);
+    
+    return MathProblem(
+      id: _generateId(),
+      operation: operation,
+      firstNumber: firstNumber,
+      secondNumber: secondNumber,
+      difficultyLevelId: 1, // Not used with custom range
+      createdAt: DateTime.now(),
+    );
+  }
 
   /// Generate number within range
   static int _generateNumber(int min, int max) {

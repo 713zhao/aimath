@@ -3,13 +3,18 @@ import 'package:provider/provider.dart';
 import '../providers/student_provider.dart';
 import '../providers/statistics_provider.dart';
 import '../utils/colors.dart';
-import '../utils/constants.dart';
+import '../utils/enums.dart';
 import '../widgets/stats_display.dart';
 import '../widgets/achievement_preview.dart';
 
 /// Home screen showing student profile, stats, and navigation
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  final bool showBottomNav;
+
+  const HomeScreen({
+    Key? key,
+    this.showBottomNav = true,
+  }) : super(key: key);
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -55,216 +60,207 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Math Practice'),
+        centerTitle: true,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.bar_chart),
             onPressed: () {
-              // Navigate to settings
-              // Navigator.pushNamed(context, '/settings');
+              Navigator.pushNamed(context, '/progress');
             },
+            tooltip: 'View Progress',
           ),
         ],
       ),
-      body: Consumer2<StudentProvider, StatisticsProvider>(
-        builder: (context, studentProvider, statsProvider, child) {
-          if (!studentProvider.hasStudent) {
-            return _buildNoStudentView();
-          }
+      body: SafeArea(
+        child: Consumer2<StudentProvider, StatisticsProvider>(
+          builder: (context, studentProvider, statsProvider, child) {
+            final student = studentProvider.currentStudent;
 
-          final student = studentProvider.currentStudent!;
-          final accuracy = statsProvider.getAccuracyBreakdown();
+            if (student == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Welcome header
-                _buildWelcomeHeader(student.name, student.currentDifficultyLevel),
+            // Build accuracy map from stats
+            final accuracyMap = <String, double>{};
+            for (final stat in statsProvider.studentStats) {
+              final opName = stat.operation.displayName;
+              accuracyMap[opName] = stat.accuracyPercentage;
+            }
 
-                const SizedBox(height: AppConstants.largePadding),
+            return RefreshIndicator(
+              onRefresh: () async {
+                await studentProvider.loadStudent(student.id);
+                await statsProvider.loadStudentStats(student.id);
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Welcome Card
+                    _buildWelcomeCard(context, student.name),
+                    const SizedBox(height: 16),
 
-                // Main stats
-                StatsDisplay(
-                  currentLevel: student.currentDifficultyLevel,
-                  totalPoints: student.totalPoints,
-                  currentStreak: student.currentStreak,
-                  overallAccuracy: student.overallAccuracyPercentage,
-                  accuracyByOperation: accuracy,
-                  onViewDetails: () {
-                    // Navigate to detailed statistics
-                  },
-                ),
-
-                const SizedBox(height: AppConstants.largePadding),
-
-                // Achievements preview
-                AchievementPreview(
-                  achievementIcons: student.achievementIds.take(3).toList().isEmpty
-                      ? []
-                      : List.filled(student.achievementIds.take(3).length, '⭐'),
-                  achievementTitles: List.filled(
-                    student.achievementIds.take(3).length,
-                    'Achievement',
-                  ),
-                  totalAchievements: student.achievementCount,
-                  onViewAll: () {
-                    // Navigate to achievements
-                  },
-                ),
-
-                const SizedBox(height: AppConstants.largePadding),
-
-                // Start practice button
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppConstants.defaultPadding,
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/difficulty-selector');
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.successGreen,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppConstants.defaultBorderRadius,
+                    // Stats Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStatCard(
+                            context,
+                            icon: Icons.star,
+                            label: 'Level',
+                            value: 'P${student.currentDifficultyLevel}',
+                            color: AppColors.warningOrange,
                           ),
                         ),
-                      ),
-                      child: Text(
-                        'Start Practice',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildStatCard(
+                            context,
+                            icon: Icons.monetization_on,
+                            label: 'Points',
+                            value: '${student.totalPoints}',
+                            color: AppColors.successGreen,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ),
-                ),
+                    const SizedBox(height: 24),
 
-                const SizedBox(height: AppConstants.defaultPadding),
-
-                // Continue session button (if applicable)
-                if (_shouldShowContinueButton(student))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppConstants.defaultPadding,
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          // Continue previous session
-                        },
-                        child: Text(
-                          'Continue Session',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                const SizedBox(height: AppConstants.largePadding),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildWelcomeHeader(String name, int level) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primaryBlue,
-            AppColors.primaryBlue.withValues(alpha: 0.7),
-          ],
-        ),
-      ),
-      padding: const EdgeInsets.all(AppConstants.defaultPadding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Welcome, $name! 👋',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: AppConstants.smallPadding),
-          Row(
-            children: [
-              Text(
-                'Current Level: ',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white70,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppConstants.smallPadding,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      '⭐ ',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Text(
-                      'Level $level',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white,
+                    // Weekly Stats
+                    const Text(
+                      'This Week',
+                      style: TextStyle(
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    StatsDisplay(
+                      currentLevel: student.currentDifficultyLevel,
+                      totalPoints: student.totalPoints,
+                      currentStreak: student.currentStreak,
+                      overallAccuracy: student.overallAccuracyPercentage,
+                      accuracyByOperation: accuracyMap,
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Achievements Preview
+                    const Text(
+                      'Recent Achievements',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    AchievementPreview(
+                      achievementIcons: const ['🏆', '⭐', '🎯'],
+                      achievementTitles: const ['First Win', 'Practice Star', 'Accurate'],
+                      totalAchievements: student.achievementIds.length,
+                    ),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
-            ],
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  bool _shouldShowContinueButton(student) {
-    // Check if there's an ongoing session
-    // This would typically check if there's a session started but not completed
-    return false; // Placeholder
+  Widget _buildWelcomeCard(BuildContext context, String name) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [
+              AppColors.primaryBlue,
+              AppColors.primaryBlue.withValues(alpha: 0.7),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Welcome back,',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white.withValues(alpha: 0.9),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              name,
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Ready to practice some math?',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white.withValues(alpha: 0.9),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  Widget _buildNoStudentView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'No Student Selected',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: AppConstants.defaultPadding),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pushNamed(context, '/student-selection');
-            },
-            child: const Text('Select Student'),
-          ),
-        ],
+  Widget _buildStatCard(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Icon(icon, size: 32, color: color),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

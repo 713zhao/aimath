@@ -1,347 +1,171 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../config/difficulty_config.dart';
-import '../providers/student_provider.dart';
-import '../providers/statistics_provider.dart';
-import '../utils/colors.dart';
-import '../utils/constants.dart';
-import '../utils/enums.dart';
-import '../widgets/difficulty_card.dart';
+import 'package:aimath/providers/student_provider.dart';
+import 'package:aimath/providers/game_provider.dart';
+import 'package:aimath/models/difficulty_level.dart';
+import 'package:aimath/models/operation_type.dart';
+import 'package:aimath/widgets/difficulty_card.dart';
+import 'package:aimath/utils/colors.dart';
 
-/// Screen for selecting difficulty level and operations for practice
 class DifficultySelectorScreen extends StatefulWidget {
-  const DifficultySelectorScreen({Key? key}) : super(key: key);
+  final bool asSettingsTab;
+
+  const DifficultySelectorScreen({
+    super.key,
+    this.asSettingsTab = false,
+  });
 
   @override
   State<DifficultySelectorScreen> createState() => _DifficultySelectorScreenState();
 }
 
 class _DifficultySelectorScreenState extends State<DifficultySelectorScreen> {
-  late int _selectedLevel;
-  late Set<Operation> _selectedOperations;
-  int _selectedTimeLimitSeconds = 180; // Default 3 minutes
-  
-  // Time limit options: label -> seconds
-  static const Map<String, int> _timeLimitOptions = {
-    'No Limit': 0,
-    '1 minute': 60,
-    '2 minutes': 120,
-    '3 minutes': 180,
-    '5 minutes': 300,
-    '10 minutes': 600,
-  };
+  DifficultyLevel _selectedLevel = DifficultyLevel.level1;
+  final Set<OperationType> _selectedOperations = {OperationType.addition};
 
   @override
   void initState() {
     super.initState();
-    _selectedLevel = context.read<StudentProvider>().currentLevel ?? 1;
-    _selectedOperations = {
-      Operation.add,
-      Operation.subtract,
-      Operation.multiply,
-      Operation.divide,
-    };
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSavedSettings();
+    });
+  }
+
+  void _loadSavedSettings() {
+    final studentProvider = context.read<StudentProvider>();
+    final gameProvider = context.read<GameProvider>();
+    
+    if (studentProvider.profile != null) {
+      setState(() {
+        _selectedLevel = studentProvider.profile!.currentLevel;
+      });
+    }
+    
+    // Load saved operation preferences if available
+    final savedOperations = gameProvider.selectedOperations;
+    if (savedOperations.isNotEmpty) {
+      setState(() {
+        _selectedOperations.clear();
+        _selectedOperations.addAll(savedOperations);
+      });
+    }
+  }
+
+  void _toggleOperation(OperationType operation) {
+    setState(() {
+      if (_selectedOperations.contains(operation)) {
+        if (_selectedOperations.length > 1) {
+          _selectedOperations.remove(operation);
+        }
+      } else {
+        _selectedOperations.add(operation);
+      }
+    });
+    _saveSettings();
+  }
+
+  void _selectLevel(DifficultyLevel level) {
+    final studentProvider = context.read<StudentProvider>();
+    final unlockedLevels = studentProvider.profile?.unlockedLevels ?? [DifficultyLevel.level1];
+    
+    if (unlockedLevels.contains(level)) {
+      setState(() {
+        _selectedLevel = level;
+      });
+      _saveSettings();
+    }
+  }
+
+  void _saveSettings() {
+    final gameProvider = context.read<GameProvider>();
+    gameProvider.setDifficulty(_selectedLevel);
+    gameProvider.setOperations(_selectedOperations.toList());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select Difficulty'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+        title: Text(widget.asSettingsTab ? 'Settings' : 'Select Difficulty'),
+        centerTitle: true,
+        elevation: 0,
+        automaticallyImplyLeading: !widget.asSettingsTab,
+        actions: widget.asSettingsTab
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.person),
+                  onPressed: () => _showProfileSettings(context),
+                  tooltip: 'Profile Settings',
+                ),
+              ]
+            : null,
       ),
-      body: Consumer2<StudentProvider, StatisticsProvider>(
-        builder: (context, studentProvider, statsProvider, child) {
-          final currentLevel = studentProvider.currentLevel ?? 1;
-
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Difficulty levels
-                Padding(
-                  padding: const EdgeInsets.all(AppConstants.defaultPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Difficulty Level',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: AppConstants.defaultPadding),
-                      ...DifficultyConfig.allLevels.map((level) {
-                        final isUnlocked = level.id <= currentLevel;
-                        final previousLevel = level.id > 1
-                            ? DifficultyConfig.getLevelById(level.id - 1)
-                            : null;
-                        final progressToUnlock = previousLevel != null
-                            ? statsProvider
-                                .getLevelAccuracy(previousLevel.id)
-                                .clamp(0, 100) /
-                                100
-                            : 1.0;
-
-                        return Padding(
-                          padding: const EdgeInsets.only(
-                            bottom: AppConstants.defaultPadding,
-                          ),
-                          child: DifficultyCard(
-                            level: level,
-                            isSelected: _selectedLevel == level.id,
-                            isUnlocked: isUnlocked,
-                            progressToUnlock: progressToUnlock,
-                            onSelect: () {
-                              setState(() {
-                                _selectedLevel = level.id;
-                              });
-                            },
-                          ),
-                        );
-                      }).toList(),
-                    ],
-                  ),
-                ),
-
-                // Operation selection
-                Padding(
-                  padding: const EdgeInsets.all(AppConstants.defaultPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Operations',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: AppConstants.defaultPadding),
-                      Row(
-                        children: [
-                          _buildOperationCheckbox(
-                            context,
-                            Operation.add,
-                            'Addition',
-                            '➕',
-                          ),
-                          const SizedBox(width: AppConstants.defaultPadding),
-                          _buildOperationCheckbox(
-                            context,
-                            Operation.subtract,
-                            'Subtraction',
-                            '➖',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppConstants.defaultPadding),
-                      Row(
-                        children: [
-                          _buildOperationCheckbox(
-                            context,
-                            Operation.multiply,
-                            'Multiplication',
-                            '✖️',
-                          ),
-                          const SizedBox(width: AppConstants.defaultPadding),
-                          _buildOperationCheckbox(
-                            context,
-                            Operation.divide,
-                            'Division',
-                            '➗',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Time Limit Selection
-                Padding(
-                  padding: const EdgeInsets.all(AppConstants.defaultPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Time Limit',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: AppConstants.smallPadding),
-                      Text(
-                        'Set a time limit for the entire practice session',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.secondaryText,
-                        ),
-                      ),
-                      const SizedBox(height: AppConstants.defaultPadding),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.primaryBlue),
-                          borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
-                        ),
-                        child: DropdownButton<int>(
-                          value: _selectedTimeLimitSeconds,
-                          isExpanded: true,
-                          underline: const SizedBox(),
-                          icon: const Icon(Icons.timer, color: AppColors.primaryBlue),
-                          items: _timeLimitOptions.entries.map((entry) {
-                            return DropdownMenuItem<int>(
-                              value: entry.value,
-                              child: Text(
-                                entry.key,
-                                style: TextStyle(
-                                  color: entry.value == _selectedTimeLimitSeconds
-                                      ? AppColors.primaryBlue
-                                      : AppColors.darkText,
-                                  fontWeight: entry.value == _selectedTimeLimitSeconds
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                _selectedTimeLimitSeconds = value;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: AppConstants.largePadding),
-
-                // Buttons
-                Padding(
-                  padding: const EdgeInsets.all(AppConstants.defaultPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      ElevatedButton(
-                        onPressed: _selectedOperations.isEmpty
-                            ? null
-                            : () {
-                                _startPractice(context);
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.successGreen,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: AppConstants.defaultPadding,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppConstants.defaultBorderRadius,
-                            ),
-                          ),
-                        ),
-                        child: Text(
-                          'Start Practice',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppConstants.smallPadding),
-                      OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: AppConstants.defaultPadding,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppConstants.defaultBorderRadius,
-                            ),
-                          ),
-                        ),
-                        child: Text(
-                          'Cancel',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildOperationCheckbox(
-    BuildContext context,
-    Operation operation,
-    String label,
-    String icon,
-  ) {
-    final isSelected = _selectedOperations.contains(operation);
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            if (isSelected) {
-              if (_selectedOperations.length > 1) {
-                _selectedOperations.remove(operation);
-              }
-            } else {
-              _selectedOperations.add(operation);
-            }
-          });
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primaryBlue.withValues(alpha: 0.1) : Colors.transparent,
-            border: Border.all(
-              color: isSelected ? AppColors.primaryBlue : AppColors.lightGray,
-              width: isSelected ? 2 : 1,
-            ),
-            borderRadius: BorderRadius.circular(AppConstants.smallBorderRadius),
-          ),
-          padding: const EdgeInsets.all(AppConstants.defaultPadding),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Checkbox(
-                value: isSelected,
-                onChanged: (_) {
-                  setState(() {
-                    if (isSelected) {
-                      if (_selectedOperations.length > 1) {
-                        _selectedOperations.remove(operation);
-                      }
-                    } else {
-                      _selectedOperations.add(operation);
-                    }
-                  });
-                },
-                activeColor: AppColors.primaryBlue,
-              ),
-              const SizedBox(height: AppConstants.smallPadding),
-              Text(
-                icon,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: AppConstants.smallPadding),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w500,
+              // Difficulty Section
+              const Text(
+                'Difficulty Level',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 8),
+              const Text(
+                'Select your practice difficulty',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildDifficultyCards(),
+              const SizedBox(height: 32),
+
+              // Operations Section
+              const Text(
+                'Operations',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Choose which operations to practice',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildOperationToggles(),
+
+              if (widget.asSettingsTab) ...[
+                const SizedBox(height: 32),
+                const Divider(),
+                const SizedBox(height: 16),
+                
+                // App Settings Section
+                const Text(
+                  'App Settings',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildAppSettings(),
+              ],
+
+              if (!widget.asSettingsTab) ...[
+                const SizedBox(height: 32),
+                _buildActionButtons(),
+              ],
             ],
           ),
         ),
@@ -349,18 +173,308 @@ class _DifficultySelectorScreenState extends State<DifficultySelectorScreen> {
     );
   }
 
-  void _startPractice(BuildContext context) {
-    final operations = _selectedOperations.toList();
-    
-    // Navigate to practice session with selected parameters
-    Navigator.pushNamed(
-      context,
-      '/practice-session',
-      arguments: {
-        'difficultyLevel': _selectedLevel,
-        'operations': operations,
-        'timeLimitSeconds': _selectedTimeLimitSeconds,
+  Widget _buildDifficultyCards() {
+    return Consumer<StudentProvider>(
+      builder: (context, provider, child) {
+        final unlockedLevels = provider.profile?.unlockedLevels ?? [DifficultyLevel.level1];
+
+        return Column(
+          children: DifficultyLevel.values.map((level) {
+            final isUnlocked = unlockedLevels.contains(level);
+            final isSelected = _selectedLevel == level;
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: DifficultyCard(
+                level: level,
+                isSelected: isSelected,
+                isUnlocked: isUnlocked,
+                onTap: () => _selectLevel(level),
+              ),
+            );
+          }).toList(),
+        );
       },
+    );
+  }
+
+  Widget _buildOperationToggles() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: OperationType.values.map((operation) {
+        final isSelected = _selectedOperations.contains(operation);
+        return FilterChip(
+          label: Text(
+            '${operation.name} (${operation.symbol})',
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.black87,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          selected: isSelected,
+          onSelected: (_) => _toggleOperation(operation),
+          selectedColor: AppColors.primary,
+          checkmarkColor: Colors.white,
+          backgroundColor: Colors.grey[200],
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildAppSettings() {
+    return Column(
+      children: [
+        _buildSettingsTile(
+          icon: Icons.volume_up,
+          title: 'Sound Effects',
+          subtitle: 'Enable sound feedback',
+          trailing: Switch(
+            value: true, // TODO: Connect to actual setting
+            onChanged: (value) {
+              // TODO: Implement sound toggle
+            },
+            activeColor: AppColors.primary,
+          ),
+        ),
+        _buildSettingsTile(
+          icon: Icons.timer,
+          title: 'Timer Duration',
+          subtitle: '30 seconds per problem',
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            // TODO: Show timer duration picker
+          },
+        ),
+        _buildSettingsTile(
+          icon: Icons.format_list_numbered,
+          title: 'Problems per Session',
+          subtitle: '10 problems',
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            // TODO: Show problem count picker
+          },
+        ),
+        const Divider(height: 32),
+        _buildSettingsTile(
+          icon: Icons.delete_outline,
+          title: 'Clear Progress',
+          subtitle: 'Reset all data',
+          trailing: const Icon(Icons.chevron_right),
+          textColor: AppColors.error,
+          onTap: () => _showClearDataDialog(context),
+        ),
+        _buildSettingsTile(
+          icon: Icons.info_outline,
+          title: 'About',
+          subtitle: 'Version 1.0.0',
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            // TODO: Show about dialog
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingsTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Widget trailing,
+    Color? textColor,
+    VoidCallback? onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: textColor ?? AppColors.primary),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: FontWeight.w500,
+          color: textColor,
+        ),
+      ),
+      subtitle: Text(subtitle),
+      trailing: trailing,
+      onTap: onTap,
+      contentPadding: EdgeInsets.zero,
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const Text('Cancel'),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          flex: 2,
+          child: ElevatedButton(
+            onPressed: () {
+              _saveSettings();
+              Navigator.pushNamed(context, '/practice');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const Text(
+              'Start Practice',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showProfileSettings(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Profile Settings',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Change Name'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showChangeNameDialog(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.restart_alt),
+                title: const Text('Reset Profile'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showResetProfileDialog(context);
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showChangeNameDialog(BuildContext context) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change Name'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'New Name',
+            hintText: 'Enter your name',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                context.read<StudentProvider>().updateName(controller.text.trim());
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showResetProfileDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Profile'),
+        content: const Text(
+          'This will reset your profile to Level 1 but keep your points and achievements. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              context.read<StudentProvider>().resetLevel();
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.warning,
+            ),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showClearDataDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear All Data'),
+        content: const Text(
+          'This will permanently delete all your progress, points, and achievements. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              context.read<StudentProvider>().clearAllData();
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+            ),
+            child: const Text('Delete All'),
+          ),
+        ],
+      ),
     );
   }
 }

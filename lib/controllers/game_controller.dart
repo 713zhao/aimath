@@ -12,6 +12,8 @@ class GameController {
   // Session data
   late String _studentId;
   late int _difficultyLevel;
+  late int _minNumber;
+  late int _maxNumber;
   late List<Operation> _selectedOperations;
   late List<MathProblem> _sessionProblems;
   late List<ProblemAttempt> _sessionAttempts;
@@ -57,14 +59,19 @@ class GameController {
     required String studentId,
     required int difficultyLevel,
     required List<Operation> selectedOperations,
+    int minNumber = 0,
+    int maxNumber = 10,
   }) {
     _studentId = studentId;
     _difficultyLevel = difficultyLevel;
+    _minNumber = minNumber;
+    _maxNumber = maxNumber;
     _selectedOperations = selectedOperations;
     
-    // Generate problems for the session
-    _sessionProblems = ProblemGenerator.generateSessionProblems(
-      difficultyLevelId: difficultyLevel,
+    // Generate problems for the session using custom number range
+    _sessionProblems = ProblemGenerator.generateSessionProblemsWithRange(
+      minNumber: minNumber,
+      maxNumber: maxNumber,
       operations: selectedOperations,
       problemCount: DifficultyConfig.problemsPerSession,
     );

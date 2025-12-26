@@ -52,6 +52,8 @@ class GameProvider extends ChangeNotifier {
     required String studentId,
     required int difficultyLevel,
     required List<Operation> selectedOperations,
+    int minNumber = 0,
+    int maxNumber = 10,
   }) async {
     try {
       // Initialize game controller
@@ -59,6 +61,8 @@ class GameProvider extends ChangeNotifier {
         studentId: studentId,
         difficultyLevel: difficultyLevel,
         selectedOperations: selectedOperations,
+        minNumber: minNumber,
+        maxNumber: maxNumber,
       );
 
       // Set up callbacks

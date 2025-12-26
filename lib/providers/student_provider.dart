@@ -144,6 +144,23 @@ class StudentProvider extends ChangeNotifier {
         sessionCompleted: true,
         sessionAccuracy: sessionAccuracy,
       );
+      
+      // Check for level promotion based on total points
+      // Level 2 = 500 points, Level 3 = 1500 points, Level 4 = 3000 points
+      final totalPoints = updated.totalPoints;
+      int newLevel = 1;
+      if (totalPoints >= 3000) {
+        newLevel = 4;
+      } else if (totalPoints >= 1500) {
+        newLevel = 3;
+      } else if (totalPoints >= 500) {
+        newLevel = 2;
+      }
+      
+      if (newLevel > updated.currentDifficultyLevel) {
+        updated = updated.copyWith(currentDifficultyLevel: newLevel);
+        print('Level up! New level: $newLevel');
+      }
 
       _currentStudent = updated;
       await _storageService.saveStudentProfile(updated);
