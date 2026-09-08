@@ -312,18 +312,30 @@ class _PracticeStartScreenState extends State<PracticeStartScreen> {
     return labels.join(' ');
   }
 
-  void _startPracticeSession(BuildContext context) {
-    final operations = _enabledOperations.map((op) {
+  Future<void> _startPracticeSession(BuildContext context) async {
+    // Load latest settings from SharedPreferences in case user changed them
+    final prefs = await SharedPreferences.getInstance();
+    final savedOps = prefs.getStringList('enabledOperations') ?? ['add', 'subtract', 'multiply', 'divide'];
+    final minNum = prefs.getInt('minNumber') ?? _minNumber;
+    final maxNum = prefs.getInt('maxNumber') ?? _maxNumber;
+    final timeLimit = prefs.getInt('timeLimit') ?? _timeLimit;
+
+    final operations = savedOps.map((op) {
       switch (op) {
-        case 'add': return Operation.add;
-        case 'subtract': return Operation.subtract;
-        case 'multiply': return Operation.multiply;
-        case 'divide': return Operation.divide;
-        default: return Operation.add;
+        case 'add':
+          return Operation.add;
+        case 'subtract':
+          return Operation.subtract;
+        case 'multiply':
+          return Operation.multiply;
+        case 'divide':
+          return Operation.divide;
+        default:
+          return Operation.add;
       }
     }).toList();
-    
-    widget.onStartPractice(operations, _timeLimit, _minNumber, _maxNumber);
+
+    widget.onStartPractice(operations, timeLimit, minNum, maxNum);
   }
 
   Widget _buildQuickStatCard(
