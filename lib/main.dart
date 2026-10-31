@@ -6,6 +6,7 @@ import 'utils/theme.dart';
 import 'providers/student_provider.dart';
 import 'providers/game_provider.dart';
 import 'providers/statistics_provider.dart';
+import 'providers/learning_provider.dart';
 import 'services/storage_service.dart';
 import 'services/audio_service.dart';
 import 'screens/main_shell.dart';
@@ -36,6 +37,9 @@ void main() async {
         ),
         ChangeNotifierProvider(
           create: (_) => StatisticsProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => LearningProvider(),
         ),
       ],
       child: const MathPracticeApp(),

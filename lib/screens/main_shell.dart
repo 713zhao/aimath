@@ -5,6 +5,7 @@ import '../screens/home_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/practice_session_screen.dart';
 import '../screens/games/games_hub_screen.dart';
+import '../screens/learning/learn_screen.dart';
 import '../providers/student_provider.dart';
 import '../utils/colors.dart';
 import '../utils/enums.dart';
@@ -26,6 +27,7 @@ class _MainShellState extends State<MainShell> {
         index: _currentIndex,
         children: [
           const HomeScreen(showBottomNav: false),
+          const LearnScreen(),
           PracticeTab(onNavigateHome: () => setState(() => _currentIndex = 0)),
           const GamesHubScreen(),
           const SettingsScreen(),
@@ -65,6 +67,11 @@ class _MainShellState extends State<MainShell> {
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
               label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.school_outlined),
+              activeIcon: Icon(Icons.school),
+              label: 'Learn',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.play_circle_outline),
