@@ -55,6 +55,13 @@ class MathPracticeApp extends StatelessWidget {
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
       home: const SplashScreen(),
+      // Always boot through the splash screen and replace it with the main
+      // shell. Opening the web URL "#/main" directly would otherwise stack
+      // [Splash, MainShell], giving the home screen a back arrow that pops
+      // to a splash screen that never navigates again.
+      onGenerateInitialRoutes: (_) => [
+        MaterialPageRoute(builder: (_) => const SplashScreen()),
+      ],
       routes: {
         '/main': (context) => const MainShell(),
         '/progress': (context) => const ProgressDashboardScreen(),

@@ -24,6 +24,31 @@ class _SplashScreenState extends State<SplashScreen> {
     final statsProvider = context.read<StatisticsProvider>();
     final prefs = await SharedPreferences.getInstance();
 
+    // Embedded in the spell game: it passes the signed-in player in the URL
+    // (?user=NAME&age=N), so sign that player in automatically instead of
+    // asking for a name again. Names are matched case-insensitively.
+    final params = Uri.base.queryParameters;
+    final embeddedName = params['user']?.trim();
+    if (embeddedName != null && embeddedName.length >= 2) {
+      final id = 'student_ext_${embeddedName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_\u4e00-\u9fff]'), '_')}';
+      await studentProvider.loadStudent(id);
+      if (!studentProvider.hasStudent) {
+        final age = (int.tryParse(params['age'] ?? '') ?? 7).clamp(5, 18);
+        await studentProvider.createStudent(
+          id: id,
+          name: embeddedName,
+          age: age,
+        );
+      }
+      if (studentProvider.hasStudent) {
+        await prefs.setString('lastUserId', id);
+        await statsProvider.loadStudentStats(id);
+        if (!mounted) return;
+        _navigateToMain();
+        return;
+      }
+    }
+
     // Try to load last logged in user
     final lastUserId = prefs.getString('lastUserId') ?? 'student_1';
     await studentProvider.loadStudent(lastUserId);
@@ -51,63 +76,97 @@ class _SplashScreenState extends State<SplashScreen> {
   void _showNameInputDialog() {
     final nameController = TextEditingController();
     final ageController = TextEditingController();
-    
+    String? errorText;
+    bool isSubmitting = false;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Welcome!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Let\'s get started!'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                hintText: 'Enter your name',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-              textCapitalization: TextCapitalization.words,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          Future<void> submit(void Function(void Function()) setState) async {
+            final name = nameController.text.trim();
+            final age = int.tryParse(ageController.text.trim()) ?? 7;
+
+            if (name.length < 2 || name.length > 50) {
+              setState(() => errorText = 'Name must be 2-50 characters');
+              return;
+            }
+
+            setState(() {
+              errorText = null;
+              isSubmitting = true;
+            });
+
+            final studentId = 'student_${DateTime.now().millisecondsSinceEpoch}';
+            final studentProvider = context.read<StudentProvider>();
+            final student = await studentProvider.createStudent(
+              id: studentId,
+              name: name,
+              age: age.clamp(5, 18),
+            );
+
+            if (student == null) {
+              setState(() {
+                isSubmitting = false;
+                errorText = studentProvider.error ?? 'Could not create profile. Please try again.';
+              });
+              return;
+            }
+
+            // Save as last logged in user
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('lastUserId', studentId);
+            if (mounted) {
+              Navigator.pop(dialogContext);
+              _navigateToMain();
+            }
+          }
+
+          return AlertDialog(
+            title: const Text('Welcome!'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Let\'s get started!'),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Name',
+                    hintText: 'Enter your name',
+                    border: const OutlineInputBorder(),
+                    errorText: errorText,
+                  ),
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.words,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: ageController,
+                  decoration: const InputDecoration(
+                    labelText: 'Age',
+                    hintText: 'Enter your age',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ageController,
-              decoration: const InputDecoration(
-                labelText: 'Age',
-                hintText: 'Enter your age',
-                border: OutlineInputBorder(),
+            actions: [
+              ElevatedButton(
+                onPressed: isSubmitting ? null : () => submit(setDialogState),
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Start'),
               ),
-              keyboardType: TextInputType.number,
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () async {
-              final name = nameController.text.trim();
-              final age = int.tryParse(ageController.text.trim()) ?? 7;
-              if (name.isNotEmpty) {
-                final studentId = 'student_${DateTime.now().millisecondsSinceEpoch}';
-                await context.read<StudentProvider>().createStudent(
-                  id: studentId,
-                  name: name,
-                  age: age.clamp(5, 18),
-                );
-                // Save as last logged in user
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('lastUserId', studentId);
-                if (mounted) {
-                  Navigator.pop(dialogContext);
-                  _navigateToMain();
-                }
-              }
-            },
-            child: const Text('Start'),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }

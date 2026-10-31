@@ -176,6 +176,20 @@ class AchievementDefinitions {
       points: 250,
     ),
     AchievementDef(
+      id: 'pizza_master',
+      title: 'Pizza Master',
+      description: 'Get a perfect score in Pizza Slices',
+      icon: '🍕',
+      points: 50,
+    ),
+    AchievementDef(
+      id: 'fraction_fan',
+      title: 'Fraction Fan',
+      description: 'Solve 50 fraction questions in Pizza Slices',
+      icon: '🥧',
+      points: 75,
+    ),
+    AchievementDef(
       id: '1000_points',
       title: 'Point Collector',
       description: 'Earn 1000 points',

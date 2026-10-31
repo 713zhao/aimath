@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/home_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/practice_session_screen.dart';
+import '../screens/games/games_hub_screen.dart';
 import '../providers/student_provider.dart';
 import '../utils/colors.dart';
 import '../utils/enums.dart';
@@ -26,6 +27,7 @@ class _MainShellState extends State<MainShell> {
         children: [
           const HomeScreen(showBottomNav: false),
           PracticeTab(onNavigateHome: () => setState(() => _currentIndex = 0)),
+          const GamesHubScreen(),
           const SettingsScreen(),
         ],
       ),
@@ -68,6 +70,11 @@ class _MainShellState extends State<MainShell> {
               icon: Icon(Icons.play_circle_outline),
               activeIcon: Icon(Icons.play_circle),
               label: 'Practice',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.videogame_asset_outlined),
+              activeIcon: Icon(Icons.videogame_asset),
+              label: 'Games',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.settings_outlined),

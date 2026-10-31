@@ -60,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Math Practice'),
+        automaticallyImplyLeading: false,
         centerTitle: true,
         elevation: 0,
         actions: [

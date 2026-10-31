@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/achievement.dart';
 import 'package:provider/provider.dart';
 import '../providers/statistics_provider.dart';
 import '../providers/student_provider.dart';
@@ -58,7 +59,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
                 const SizedBox(height: AppConstants.largePadding),
                 _buildLevelProgression(studentProvider),
                 const SizedBox(height: AppConstants.largePadding),
-                _buildAchievements(statsProvider),
+                _buildAchievements(statsProvider, studentProvider),
                 const SizedBox(height: AppConstants.largePadding),
               ],
             ),
@@ -291,7 +292,8 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
   }
 
   /// Build achievements section
-  Widget _buildAchievements(StatisticsProvider statsProvider) {
+  Widget _buildAchievements(
+      StatisticsProvider statsProvider, StudentProvider studentProvider) {
     final sessions = statsProvider.studentSessions;
     final totalPoints = sessions.fold<int>(0, (sum, session) => sum + session.totalPoints);
     final sessionsCount = sessions.length;
@@ -301,6 +303,14 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
     if (totalPoints >= 500) unlockedAchievements.add('500 Points');
     if (totalPoints >= 1000) unlockedAchievements.add('1000 Points');
     if (sessionsCount >= 7) unlockedAchievements.add('Week Warrior');
+
+    // Achievements unlocked in games are stored on the student profile.
+    for (final id in studentProvider.currentStudent?.achievementIds ?? const <String>[]) {
+      final title = AchievementDefinitions.getById(id)?.title;
+      if (title != null && !unlockedAchievements.contains(title)) {
+        unlockedAchievements.add(title);
+      }
+    }
 
     return Card(
       elevation: 2,
@@ -583,6 +593,8 @@ class _AchievementBadge extends StatelessWidget {
   String _getAchievementEmoji(String achievement) {
     if (achievement.contains('Points')) return '💎';
     if (achievement.contains('Warrior')) return '⚔️';
+    if (achievement.contains('Pizza')) return '🍕';
+    if (achievement.contains('Fraction')) return '🥧';
     return '⭐';
   }
 }
